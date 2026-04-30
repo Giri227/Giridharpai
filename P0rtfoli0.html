@@ -11,7 +11,7 @@
     <meta property="og:title" content="Giridhar Pai - Cyber Security Portfolio">
     <meta property="og:description" content="Giridhar Pai - Cyber Security Student | AWS Certified Security Specialist | Hackathon Winner">
     <meta property="og:image" content="images/profile.JPG">
-    <meta property="og:url" content="https://your-website-url.com">
+    <meta property="og:url" content="https://giridhar-pai.vercel.app/portfolio">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <title>GIRIDHAR PAI - Security Operations Center</title>
@@ -2377,7 +2377,21 @@
 
         let awaitingPassword = false;
         let pendingCommand = null;
-        const ADMIN_PASS = 'Pa$$w0rd';
+        // Password verified via SHA-256 hash - plain text never stored in source
+        const ADMIN_PASS_HASH = '97c94ebe5d767a353b77f3c0ce2d429741f2e8c99473c3c150e2faa3d14c9da6';
+
+        async function hashInput(input) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(input);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function checkAdminPass(input) {
+            const hash = await hashInput(input);
+            return hash === ADMIN_PASS_HASH;
+        }
 
         // Message Listener for Identity Name
         window.addEventListener('message', (event) => {
@@ -2562,13 +2576,14 @@
             }
         });
 
-        terminalInput.addEventListener('keypress', (e) => {
+        terminalInput.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
                 const inputVal = terminalInput.value.trim();
 
                 if (awaitingPassword) {
-                    // Password Check
-                    if (inputVal === ADMIN_PASS) {
+                    // Password Check (async SHA-256 hash comparison)
+                    const isValid = await checkAdminPass(inputVal);
+                    if (isValid) {
                         terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-green);">✓ ACCESS GRANTED</span></div>`;
 
                         if (pendingCommand === 'add') {
@@ -3009,9 +3024,10 @@
             pendingUnlockIndex = -1;
         }
 
-        function verifyUnlockPassword() {
+        async function verifyUnlockPassword() {
             const pass = document.getElementById('researchPassword').value;
-            if (pass === ADMIN_PASS) {
+            const isValid = await checkAdminPass(pass);
+            if (isValid) {
                 closePasswordModal();
                 openResearchContent(pendingUnlockIndex);
             } else {

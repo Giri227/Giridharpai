@@ -8,55 +8,58 @@
   <meta name="description" content="A 3D Cyber War Room portfolio for Giridhar Pai, a Cyber Security enthusiast.">
   <meta name="keywords" content="cybersecurity, 3d portfolio, three.js, webgl, security, Giridhar Pai">
   <meta property="og:title" content="3D Cyber War Room - Giridhar Pai's Portfolio">
-  <meta property="og:description" content="An interactive 3D portfolio showcasing the projects and skills of Giridhar Pai in the field of Cyber Security.">
+  <meta property="og:description"
+    content="An interactive 3D portfolio showcasing the projects and skills of Giridhar Pai in the field of Cyber Security.">
   <meta property="og:image" content="images/profile.JPG">
-  <meta property="og:url" content="https://your-website-url.com">
+  <meta property="og:url" content="https://giridhar-pai.vercel.app">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/jpeg" href="images/pfp.jpg">
   <title>3D Cyber War Room - Ultra - Wide Screen </title>
+
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background-color: #0d1117;
-    }
+  body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #0d1117;
+  }
 
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
+  canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  }
 
-    #info {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: #00e0ff;
-      font-family: Inter, sans-serif;
-      font-size: 14px;
-      z-index: 100;
-    }
+  #info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #00e0ff;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  z-index: 100;
+  }
 
-    /* allow uiCanvas to have a real rect, but invisible */
-    #uiCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      opacity: 0;
-      /* invisible, but still receives layout and can be measured */
-      pointer-events: none;
-      /* so it does not block clicks (we use it only as a buffer) */
-    }
+  /* allow uiCanvas to have a real rect, but invisible */
+  #uiCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  opacity: 0;
+  /* invisible, but still receives layout and can be measured */
+  pointer-events: none;
+  /* so it does not block clicks (we use it only as a buffer) */
+  }
 
-    /* helper canvases stay fully hidden */
-    #backWallCanvas,
-    #leftWallCanvas,
-    #rightWallCanvas,
-    #topWallCanvas {
-      display: none;
-    }
+  /* helper canvases stay fully hidden */
+  #backWallCanvas,
+  #leftWallCanvas,
+  #rightWallCanvas,
+  #topWallCanvas {
+  display: none;
+  }
   </style>
 </head>
 
