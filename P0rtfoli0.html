@@ -2531,10 +2531,13 @@
             }
         }
 
-        // DATA CAPTURE
+        // DATA CAPTURE + FIREBASE INIT
         window.addEventListener('load', async () => {
-            // Initialize Firebase Logic
+            // Initialize Firebase first, then load content
             if (typeof firebase !== 'undefined') initGlobalSystem();
+
+            // Load admin content AFTER Firebase is ready
+            loadFromFirestore();
 
             try {
                 if (!sessionStorage.getItem('logged_session')) {
@@ -3042,15 +3045,23 @@
                             typeCounters[type]++;
                         });
 
-                        // Show empty state for research if nothing added
+                        // Research section: show empty state or clear placeholder
                         const researchContainer = document.querySelector('#research .research-grid');
-                        if (researchContainer && researchContainer.querySelectorAll('[data-dynamic]').length === 0) {
-                            researchContainer.innerHTML = `
-                                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary); border: 1px dashed var(--grid-lines); border-radius: 10px; background: rgba(10, 14, 26, 0.5);">
-                                    <i class="fas fa-flask" style="font-size: 2rem; margin-bottom: 20px; color: var(--accent-cyan); opacity: 0.7;"></i>
-                                    <h4 style="color: var(--accent-cyan); margin-bottom: 10px; font-family: 'Orbitron'; letter-spacing: 1px;">NO ARCHIVES FOUND</h4>
-                                    <p style="font-family: 'Rajdhani', sans-serif; opacity: 0.8;">CLASSIFIED EXPERIMENTS ARE CURRENTLY UNDERWAY.<br>PENDING DATA UPLOAD PROTOCOLS...</p>
-                                </div>`;
+                        if (researchContainer) {
+                            const hasResearch = researchContainer.querySelectorAll('[data-dynamic]').length > 0;
+                            // Remove any static placeholder (non-dynamic children)
+                            if (hasResearch) {
+                                Array.from(researchContainer.children)
+                                    .filter(el => !el.hasAttribute('data-dynamic'))
+                                    .forEach(el => el.remove());
+                            } else {
+                                researchContainer.innerHTML = `
+                                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary); border: 1px dashed var(--grid-lines); border-radius: 10px; background: rgba(10, 14, 26, 0.5);">
+                                        <i class="fas fa-flask" style="font-size: 2rem; margin-bottom: 20px; color: var(--accent-cyan); opacity: 0.7;"></i>
+                                        <h4 style="color: var(--accent-cyan); margin-bottom: 10px; font-family: 'Orbitron'; letter-spacing: 1px;">NO ARCHIVES FOUND</h4>
+                                        <p style="font-family: 'Rajdhani', sans-serif; opacity: 0.8;">CLASSIFIED EXPERIMENTS ARE CURRENTLY UNDERWAY.<br>PENDING DATA UPLOAD PROTOCOLS...</p>
+                                    </div>`;
+                            }
                         }
                     }, (err) => {
                         console.error('[CONTENT] Firestore load failed:', err);
@@ -3114,10 +3125,7 @@
             }
         }
 
-        // Load saved content on page load — from Firestore (global) or localStorage (fallback)
-        setTimeout(() => {
-            loadFromFirestore();
-        }, 1000);
+        // Content is loaded inside window 'load' event above, after Firebase init
 
         // Form Submission - Mailto Link
         document.getElementById('contactForm').addEventListener('submit', (e) => {
