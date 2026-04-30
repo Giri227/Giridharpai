@@ -2657,52 +2657,108 @@
             editingType = '';
         }
 
-        // Edit Modal Functions
+        // Edit Modal Functions — reads from Firestore (or localStorage fallback)
         function openEditModal() {
             const editList = document.getElementById('editContentList');
             editList.innerHTML = '<h3 style="color: var(--accent-cyan); font-family: Orbitron; margin-bottom: 20px;">SELECT CONTENT TO EDIT</h3>';
 
-            const types = [
-                { key: 'blog', label: 'BLOG POSTS', icon: '📝' },
-                { key: 'achievement', label: 'ACHIEVEMENTS', icon: '🏆' },
-                { key: 'project', label: 'PROJECTS', icon: '🚀' },
-                { key: 'certification', label: 'CERTIFICATIONS', icon: '🎖️' }
-            ];
+            if (globalMode && db) {
+                editList.innerHTML += '<p style="color: var(--text-muted); font-size:0.85rem; margin-bottom:15px;">Loading from global database...</p>';
+                db.collection('portfolio_content').orderBy('timestamp', 'asc').get()
+                    .then((snapshot) => {
+                        editList.innerHTML = '<h3 style="color: var(--accent-cyan); font-family: Orbitron; margin-bottom: 20px;">SELECT CONTENT TO EDIT</h3>';
+                        if (snapshot.empty) {
+                            editList.innerHTML += '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content in database yet. Use "add" command to create content first.</p>';
+                        } else {
+                            // Group by type
+                            const grouped = {};
+                            snapshot.forEach(doc => {
+                                const d = doc.data();
+                                if (!grouped[d.type]) grouped[d.type] = [];
+                                grouped[d.type].push({ ...d, docId: doc.id });
+                            });
 
-            types.forEach(type => {
-                const items = JSON.parse(localStorage.getItem(`portfolio_${type.key}s`) || '[]');
-                if (items.length > 0) {
-                    editList.innerHTML += `<h4 style="color: var(--accent-orange); font-family: Rajdhani; margin: 20px 0 10px 0;">${type.icon} ${type.label}</h4>`;
-                    items.forEach((item, index) => {
-                        editList.innerHTML += `
-                            <div style="background: var(--bg-secondary); border: 1px solid var(--grid-lines); padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s;" 
-                                 onmouseover="this.style.borderColor='var(--accent-cyan)'" 
-                                 onmouseout="this.style.borderColor='var(--grid-lines)'"
-                                 onclick="editItem('${type.key}', ${index})">
-                                <strong style="color: var(--accent-cyan);">${item.title}</strong><br>
-                                <span style="color: var(--text-muted); font-size: 0.9rem;">${item.description.substring(0, 80)}...</span>
-                            </div>
-                        `;
+                            const typeLabels = { blog: '📝 BLOG POSTS', achievement: '🏆 ACHIEVEMENTS', project: '🚀 PROJECTS', certification: '🎖️ CERTIFICATIONS', research: '🔒 RESEARCH' };
+                            Object.entries(grouped).forEach(([type, items]) => {
+                                editList.innerHTML += `<h4 style="color: var(--accent-orange); font-family: Rajdhani; margin: 20px 0 10px 0;">${typeLabels[type] || type.toUpperCase()}</h4>`;
+                                items.forEach(item => {
+                                    editList.innerHTML += `
+                                        <div style="background: var(--bg-secondary); border: 1px solid var(--grid-lines); padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s;"
+                                             onmouseover="this.style.borderColor='var(--accent-cyan)'"
+                                             onmouseout="this.style.borderColor='var(--grid-lines)'"
+                                             onclick="editItemFirestore('${item.docId}', ${JSON.stringify(item).replace(/'/g, '&#39;')})">
+                                            <strong style="color: var(--accent-cyan);">${item.title}</strong><br>
+                                            <span style="color: var(--text-muted); font-size: 0.9rem;">${(item.description || '').substring(0, 80)}...</span>
+                                        </div>`;
+                                });
+                            });
+                        }
+                        document.getElementById('editModal').classList.add('active');
+                    })
+                    .catch(err => {
+                        editList.innerHTML += `<p style="color:var(--accent-red);">Failed to load: ${err.message}</p>`;
+                        document.getElementById('editModal').classList.add('active');
                     });
+            } else {
+                // Fallback: localStorage
+                const types = [
+                    { key: 'blog', label: 'BLOG POSTS', icon: '📝' },
+                    { key: 'achievement', label: 'ACHIEVEMENTS', icon: '🏆' },
+                    { key: 'project', label: 'PROJECTS', icon: '🚀' },
+                    { key: 'certification', label: 'CERTIFICATIONS', icon: '🎖️' }
+                ];
+                types.forEach(type => {
+                    const items = JSON.parse(localStorage.getItem(`portfolio_${type.key}s`) || '[]');
+                    if (items.length > 0) {
+                        editList.innerHTML += `<h4 style="color: var(--accent-orange); font-family: Rajdhani; margin: 20px 0 10px 0;">${type.icon} ${type.label}</h4>`;
+                        items.forEach((item, index) => {
+                            editList.innerHTML += `
+                                <div style="background: var(--bg-secondary); border: 1px solid var(--grid-lines); padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s;"
+                                     onmouseover="this.style.borderColor='var(--accent-cyan)'"
+                                     onmouseout="this.style.borderColor='var(--grid-lines)'"
+                                     onclick="editItem('${type.key}', ${index})">
+                                    <strong style="color: var(--accent-cyan);">${item.title}</strong><br>
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">${item.description.substring(0, 80)}...</span>
+                                </div>`;
+                        });
+                    }
+                });
+                if (editList.children.length <= 1) {
+                    editList.innerHTML += '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content available to edit.</p>';
                 }
-            });
-
-            if (editList.innerHTML === '<h3 style="color: var(--accent-cyan); font-family: Orbitron; margin-bottom: 20px;">SELECT CONTENT TO EDIT</h3>') {
-                editList.innerHTML += '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content available to edit. Use "add" command to create content first.</p>';
+                document.getElementById('editModal').classList.add('active');
             }
+        }
 
-            document.getElementById('editModal').classList.add('active');
+        // Edit item from Firestore
+        function editItemFirestore(docId, item) {
+            document.getElementById('editIndex').value = docId;
+            document.getElementById('editType').value = item.type;
+            document.getElementById('editTitle').value = item.title;
+            document.getElementById('editDescription').value = item.description;
+            document.getElementById('editPath').value = item.imagePath || '';
+            document.getElementById('editImage').value = item.imageUrl || '';
+            updateEditPreview();
+            if (item.type === 'achievement' && item.priority) {
+                document.getElementById('editPriorityGroup').style.display = 'block';
+                document.getElementById('editPriority').value = item.priority;
+            } else {
+                document.getElementById('editPriorityGroup').style.display = 'none';
+            }
+            closeEditModal();
+            document.getElementById('editFormModal').classList.add('active');
         }
 
         function closeEditModal() {
             document.getElementById('editModal').classList.remove('active');
         }
 
+        // editItem — localStorage fallback path
         function editItem(type, index) {
             const items = JSON.parse(localStorage.getItem(`portfolio_${type}s`) || '[]');
             const item = items[index];
 
-            document.getElementById('editIndex').value = index;
+            document.getElementById('editIndex').value = index; // numeric index as fallback
             document.getElementById('editType').value = type;
             document.getElementById('editTitle').value = item.title;
             document.getElementById('editDescription').value = item.description;
@@ -2733,19 +2789,31 @@
             }
 
             const type = document.getElementById('editType').value;
-            const index = parseInt(document.getElementById('editIndex').value);
+            const docId = document.getElementById('editIndex').value; // stores docId
 
-            const key = `portfolio_${type}s`;
-            let items = JSON.parse(localStorage.getItem(key) || '[]');
-            items.splice(index, 1);
-            localStorage.setItem(key, JSON.stringify(items));
-
-            terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">🗑️ DELETED: ${type.toUpperCase()} removed successfully! Refresh page to see changes.</span></div>`;
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            if (globalMode && db && docId && !docId.match(/^\d+$/)) {
+                // Firestore delete
+                db.collection('portfolio_content').doc(docId).delete()
+                    .then(() => {
+                        terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">🗑️ DELETED: ${type.toUpperCase()} removed from global database.</span></div>`;
+                        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                    })
+                    .catch(err => {
+                        terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">✖ DELETE FAILED: ${err.message}</span></div>`;
+                        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                    });
+            } else {
+                // Fallback localStorage delete
+                const key = `portfolio_${type}s`;
+                let items = JSON.parse(localStorage.getItem(key) || '[]');
+                const idx = parseInt(docId);
+                if (!isNaN(idx)) items.splice(idx, 1);
+                localStorage.setItem(key, JSON.stringify(items));
+                terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">🗑️ DELETED locally.</span></div>`;
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
 
             closeEditFormModal();
-
-            alert('Content deleted! Please refresh the page to see the changes.');
         }
 
         // Show/hide priority field based on content type
@@ -2758,8 +2826,15 @@
             }
         });
 
-        // Handle add/edit form submission
-        document.getElementById('adminForm').addEventListener('submit', function (e) {
+        // ========== FIREBASE CONTENT SYSTEM ==========
+        // All admin-added content is stored in Firestore under "portfolio_content"
+        // collection so every visitor sees the same data in real-time.
+
+        // Tracks Firestore doc IDs for edit/delete (populated by loadFromFirestore)
+        const firestoreDocIds = {}; // key: `${type}_${index}` -> docId
+
+        // Handle add form submission — saves to Firestore (global) or localStorage (fallback)
+        document.getElementById('adminForm').addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const type = document.getElementById('contentType').value;
@@ -2770,6 +2845,7 @@
             const priority = document.getElementById('contentPriority').value;
 
             const newContent = {
+                type,
                 title,
                 description,
                 imagePath,
@@ -2778,59 +2854,69 @@
                 timestamp: new Date().toISOString()
             };
 
-            // Save to localStorage
-            saveToLocalStorage(type, newContent);
+            const btn = document.getElementById('submitBtn');
+            btn.textContent = '[ SAVING... ]';
+            btn.disabled = true;
 
-            if (type === 'research') {
-                location.reload();
-                return;
+            if (globalMode && db) {
+                try {
+                    await db.collection('portfolio_content').add(newContent);
+                    terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-green);">✓ SUCCESS: ${type.toUpperCase()} saved to global database — visible to all visitors.</span></div>`;
+                } catch (err) {
+                    console.error('Firestore save failed:', err);
+                    terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">✖ CLOUD SAVE FAILED: ${err.message}</span></div>`;
+                }
+            } else {
+                // Fallback: localStorage (only visible on this browser)
+                saveToLocalStorage(type, newContent);
+                addContentToPage(type, newContent);
+                terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-orange);">⚠ OFFLINE MODE: Content saved locally only — not visible to other visitors.</span></div>`;
             }
 
-            // Add content to appropriate section
-            addContentToPage(type, newContent);
-
-            // Show success message
-            terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-green);">✓ SUCCESS: ${type.toUpperCase()} added successfully!</span></div>`;
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
-
+            btn.textContent = '[ ADD_CONTENT ]';
+            btn.disabled = false;
             closeAdminModal();
         });
 
-        // Handle edit form submission
-        document.getElementById('editForm').addEventListener('submit', function (e) {
+        // Handle edit form submission — updates Firestore doc
+        document.getElementById('editForm').addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const type = document.getElementById('editType').value;
-            const index = parseInt(document.getElementById('editIndex').value);
+            const docId = document.getElementById('editIndex').value; // now stores docId
             const title = document.getElementById('editTitle').value;
             const description = document.getElementById('editDescription').value;
             const imagePath = document.getElementById('editPath').value;
             const imageUrl = document.getElementById('editImage').value;
             const priority = document.getElementById('editPriority').value;
 
-            const key = `portfolio_${type}s`;
-            let items = JSON.parse(localStorage.getItem(key) || '[]');
+            if (globalMode && db && docId) {
+                try {
+                    await db.collection('portfolio_content').doc(docId).update({
+                        title, description, imagePath, imageUrl, priority
+                    });
+                    terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-green);">✓ UPDATED: ${type.toUpperCase()} updated globally — all visitors will see the change.</span></div>`;
+                } catch (err) {
+                    terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-red);">✖ UPDATE FAILED: ${err.message}</span></div>`;
+                }
+            } else {
+                // Fallback localStorage path
+                const key = `portfolio_${type}s`;
+                let items = JSON.parse(localStorage.getItem(key) || '[]');
+                const idx = parseInt(docId);
+                if (!isNaN(idx) && items[idx]) {
+                    items[idx] = { title, description, imagePath, imageUrl, priority, timestamp: items[idx].timestamp };
+                    localStorage.setItem(key, JSON.stringify(items));
+                }
+                terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-orange);">⚠ OFFLINE MODE: Updated locally only.</span></div>`;
+            }
 
-            items[index] = {
-                title,
-                description,
-                imagePath,
-                imageUrl,
-                priority,
-                timestamp: items[index].timestamp // Keep original timestamp
-            };
-
-            localStorage.setItem(key, JSON.stringify(items));
-
-            terminalOutput.innerHTML += `<div style="margin-bottom: 10px;"><span style="color: var(--accent-green);">✓ UPDATED: ${type.toUpperCase()} updated successfully! Refresh page to see changes.</span></div>`;
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
-
             closeEditFormModal();
-
-            alert('Content updated! Please refresh the page to see the changes.');
         });
 
-        function addContentToPage(type, content, index = 0) {
+        function addContentToPage(type, content, index = 0, docId = null) {
             // Input Sanitization to prevent XSS
             const sanitize = (str) => {
                 const temp = document.createElement('div');
@@ -2838,10 +2924,13 @@
                 return temp.innerHTML;
             };
 
-            content.title = sanitize(content.title || '');
-            content.description = sanitize(content.description || '');
+            const safeTitle = sanitize(content.title || '');
+            const safeDesc  = sanitize(content.description || '');
 
             const finalImageUrl = content.imagePath || content.imageUrl;
+            // data-dynamic marks this card as admin-added (so it can be cleared on re-render)
+            // data-docid stores the Firestore document ID for edit/delete
+            const dynAttr = `data-dynamic="1" data-docid="${docId || ''}" data-type="${type}"`;
 
             let container, cardHTML;
 
@@ -2849,11 +2938,11 @@
                 case 'blog':
                     container = document.querySelector('#blog .blog-grid');
                     cardHTML = `
-                        <div class="blog-card">
-                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${content.title}" onerror="this.style.display='none'">` : ''}
-                            <h3>${content.title}</h3>
-                            <p style="color: var(--text-secondary); margin-top: 15px;">${content.description}</p>
-                            ${finalImageUrl ? `<button class="btn small" style="margin-top:10px;" onclick="openImagePreview('${finalImageUrl}', '${content.title}')">[ VIEW_PREVIEW ]</button>` : ''}
+                        <div class="blog-card" ${dynAttr}>
+                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${safeTitle}" onerror="this.style.display='none'">` : ''}
+                            <h3>${safeTitle}</h3>
+                            <p style="color: var(--text-secondary); margin-top: 15px;">${safeDesc}</p>
+                            ${finalImageUrl ? `<button class="btn small" style="margin-top:10px;" onclick="openImagePreview('${finalImageUrl}', '${safeTitle}')">[ VIEW_PREVIEW ]</button>` : ''}
                         </div>
                     `;
                     break;
@@ -2862,12 +2951,12 @@
                     container = document.querySelector('#experience .achievement-grid');
                     const badgeClass = content.priority || 'medium';
                     cardHTML = `
-                        <div class="achievement-card ${badgeClass}">
+                        <div class="achievement-card ${badgeClass}" ${dynAttr}>
                             <span class="achievement-badge ${badgeClass}">${(content.priority || 'medium').toUpperCase()}</span>
-                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${content.title}" class="hidden-preview-img" style="display:none;" onerror="this.style.display='none'">` : ''}
-                            <h3>${content.title}</h3>
-                            <p style="color: var(--text-secondary);">${content.description}</p>
-                            ${finalImageUrl ? `<button class="btn small" style="margin-top:15px;" onclick="openImagePreview('${finalImageUrl}', '${content.title}')">[ VIEW_PREVIEW ]</button>` : ''}
+                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${safeTitle}" class="hidden-preview-img" style="display:none;" onerror="this.style.display='none'">` : ''}
+                            <h3>${safeTitle}</h3>
+                            <p style="color: var(--text-secondary);">${safeDesc}</p>
+                            ${finalImageUrl ? `<button class="btn small" style="margin-top:15px;" onclick="openImagePreview('${finalImageUrl}', '${safeTitle}')">[ VIEW_PREVIEW ]</button>` : ''}
                         </div>
                     `;
                     break;
@@ -2875,11 +2964,11 @@
                 case 'project':
                     container = document.querySelector('#projects .projects-grid');
                     cardHTML = `
-                        <div class="project-card">
-                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${content.title}" onerror="this.style.display='none'">` : ''}
-                            <h3>${content.title}</h3>
-                            <p style="color: var(--text-secondary); margin-top: 15px;">${content.description}</p>
-                            ${finalImageUrl ? `<button class="btn small" style="margin-top:10px;" onclick="openImagePreview('${finalImageUrl}', '${content.title}')">[ VIEW_PREVIEW ]</button>` : ''}
+                        <div class="project-card" ${dynAttr}>
+                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${safeTitle}" onerror="this.style.display='none'">` : ''}
+                            <h3>${safeTitle}</h3>
+                            <p style="color: var(--text-secondary); margin-top: 15px;">${safeDesc}</p>
+                            ${finalImageUrl ? `<button class="btn small" style="margin-top:10px;" onclick="openImagePreview('${finalImageUrl}', '${safeTitle}')">[ VIEW_PREVIEW ]</button>` : ''}
                         </div>
                     `;
                     break;
@@ -2887,11 +2976,11 @@
                 case 'certification':
                     container = document.querySelector('#certifications .achievement-grid');
                     cardHTML = `
-                        <div class="achievement-card">
-                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${content.title}" class="hidden-preview-img" style="display:none;" onerror="this.style.display='none'">` : ''}
-                            <h3>${content.title}</h3>
-                            <p style="color: var(--text-secondary);">${content.description}</p>
-                            ${finalImageUrl ? `<button class="btn small" style="margin-top:15px;" onclick="openImagePreview('${finalImageUrl}', '${content.title}')">[ VIEW_PREVIEW ]</button>` : ''}
+                        <div class="achievement-card" ${dynAttr}>
+                            ${finalImageUrl ? `<img src="${finalImageUrl}" alt="${safeTitle}" class="hidden-preview-img" style="display:none;" onerror="this.style.display='none'">` : ''}
+                            <h3>${safeTitle}</h3>
+                            <p style="color: var(--text-secondary);">${safeDesc}</p>
+                            ${finalImageUrl ? `<button class="btn small" style="margin-top:15px;" onclick="openImagePreview('${finalImageUrl}', '${safeTitle}')">[ VIEW_PREVIEW ]</button>` : ''}
                         </div>
                     `;
                     break;
@@ -2899,11 +2988,11 @@
                 case 'research':
                     container = document.querySelector('#research .research-grid');
                     cardHTML = `
-                        <div class="research-card locked" onclick="unlockResearch(${index})">
+                        <div class="research-card locked" ${dynAttr} onclick="unlockResearch('${docId || index}')">
                             <i class="fas fa-lock"></i>
                             <h3>LOCKED FILE</h3>
                             <p>CLASSIFIED - AUTHENTICATION REQUIRED</p>
-                            <p style="font-size: 0.8rem; opacity: 0.7; color: var(--accent-red); margin-top: 10px;">${content.title}</p>
+                            <p style="font-size: 0.8rem; opacity: 0.7; color: var(--accent-red); margin-top: 10px;">${safeTitle}</p>
                         </div>
                     `;
                     break;
@@ -2919,6 +3008,57 @@
             let items = JSON.parse(localStorage.getItem(key) || '[]');
             items.push(content);
             localStorage.setItem(key, JSON.stringify(items));
+        }
+
+        // Load all admin-added content — from Firestore if online, localStorage as fallback
+        function loadFromFirestore() {
+            if (globalMode && db) {
+                // Real-time listener: page auto-updates when admin adds/edits/deletes
+                db.collection('portfolio_content')
+                    .orderBy('timestamp', 'asc')
+                    .onSnapshot((snapshot) => {
+                        // Clear all dynamic content containers before re-rendering
+                        const containers = {
+                            blog:          document.querySelector('#blog .blog-grid'),
+                            achievement:   document.querySelector('#experience .achievement-grid'),
+                            project:       document.querySelector('#projects .projects-grid'),
+                            certification: document.querySelector('#certifications .achievement-grid'),
+                            research:      document.querySelector('#research .research-grid')
+                        };
+
+                        // Remove only dynamically-added cards (marked with data-dynamic)
+                        Object.values(containers).forEach(c => {
+                            if (c) c.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
+                        });
+
+                        // Track per-type index for research unlock
+                        const typeCounters = {};
+
+                        snapshot.forEach((doc) => {
+                            const item = doc.data();
+                            const type = item.type;
+                            if (!typeCounters[type]) typeCounters[type] = 0;
+                            addContentToPage(type, item, typeCounters[type], doc.id);
+                            typeCounters[type]++;
+                        });
+
+                        // Show empty state for research if nothing added
+                        const researchContainer = document.querySelector('#research .research-grid');
+                        if (researchContainer && researchContainer.querySelectorAll('[data-dynamic]').length === 0) {
+                            researchContainer.innerHTML = `
+                                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary); border: 1px dashed var(--grid-lines); border-radius: 10px; background: rgba(10, 14, 26, 0.5);">
+                                    <i class="fas fa-flask" style="font-size: 2rem; margin-bottom: 20px; color: var(--accent-cyan); opacity: 0.7;"></i>
+                                    <h4 style="color: var(--accent-cyan); margin-bottom: 10px; font-family: 'Orbitron'; letter-spacing: 1px;">NO ARCHIVES FOUND</h4>
+                                    <p style="font-family: 'Rajdhani', sans-serif; opacity: 0.8;">CLASSIFIED EXPERIMENTS ARE CURRENTLY UNDERWAY.<br>PENDING DATA UPLOAD PROTOCOLS...</p>
+                                </div>`;
+                        }
+                    }, (err) => {
+                        console.error('[CONTENT] Firestore load failed:', err);
+                        loadFromLocalStorage(); // fallback
+                    });
+            } else {
+                loadFromLocalStorage();
+            }
         }
 
         function loadFromLocalStorage() {
@@ -2974,9 +3114,9 @@
             }
         }
 
-        // Load saved content on page load
+        // Load saved content on page load — from Firestore (global) or localStorage (fallback)
         setTimeout(() => {
-            loadFromLocalStorage();
+            loadFromFirestore();
         }, 1000);
 
         // Form Submission - Mailto Link
@@ -3010,10 +3150,10 @@
         });
 
         // Research Logic
-        let pendingUnlockIndex = -1;
+        let pendingUnlockIndex = null;
 
-        function unlockResearch(index) {
-            pendingUnlockIndex = index;
+        function unlockResearch(docIdOrIndex) {
+            pendingUnlockIndex = docIdOrIndex;
             document.getElementById('passwordModal').classList.add('active');
             document.getElementById('researchPassword').value = '';
             document.getElementById('researchPassword').focus();
@@ -3021,7 +3161,7 @@
 
         function closePasswordModal() {
             document.getElementById('passwordModal').classList.remove('active');
-            pendingUnlockIndex = -1;
+            pendingUnlockIndex = null;
         }
 
         async function verifyUnlockPassword() {
@@ -3036,20 +3176,42 @@
             }
         }
 
-        function openResearchContent(index) {
-            const items = JSON.parse(localStorage.getItem('portfolio_researchs') || '[]');
-            const item = items[index];
-            if (item) {
-                document.getElementById('viewTitle').textContent = `📄 ${item.title.toUpperCase()}`;
-                document.getElementById('viewContent').innerHTML = `
-                    <div style="color: var(--accent-green); border-bottom: 1px solid var(--grid-lines); padding-bottom: 10px; margin-bottom: 20px;">
-                        <strong>STATUS:</strong> DECLASSIFIED<br>
-                        <strong>DATE:</strong> ${new Date(item.timestamp).toLocaleDateString()}
-                    </div>
-                    ${item.imageUrl ? `<img src="${item.imageUrl}" style="max-width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid var(--accent-cyan);">` : ''}
-                    <div style="font-family: 'Courier New', monospace; line-height: 1.6; white-space: pre-wrap; color: #fff;">${item.description}</div>
-                `;
-                document.getElementById('viewModal').classList.add('active');
+        function openResearchContent(docIdOrIndex) {
+            if (globalMode && db && docIdOrIndex && typeof docIdOrIndex === 'string' && !docIdOrIndex.match(/^\d+$/)) {
+                // Firestore path — fetch by doc ID
+                db.collection('portfolio_content').doc(docIdOrIndex).get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            const item = doc.data();
+                            document.getElementById('viewTitle').textContent = `📄 ${item.title.toUpperCase()}`;
+                            document.getElementById('viewContent').innerHTML = `
+                                <div style="color: var(--accent-green); border-bottom: 1px solid var(--grid-lines); padding-bottom: 10px; margin-bottom: 20px;">
+                                    <strong>STATUS:</strong> DECLASSIFIED<br>
+                                    <strong>DATE:</strong> ${new Date(item.timestamp).toLocaleDateString()}
+                                </div>
+                                ${item.imageUrl || item.imagePath ? `<img src="${item.imageUrl || item.imagePath}" style="max-width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid var(--accent-cyan);">` : ''}
+                                <div style="font-family: 'Courier New', monospace; line-height: 1.6; white-space: pre-wrap; color: #fff;">${item.description}</div>
+                            `;
+                            document.getElementById('viewModal').classList.add('active');
+                        }
+                    })
+                    .catch(err => alert('Failed to load research: ' + err.message));
+            } else {
+                // Fallback: localStorage
+                const items = JSON.parse(localStorage.getItem('portfolio_researchs') || '[]');
+                const item = items[parseInt(docIdOrIndex)];
+                if (item) {
+                    document.getElementById('viewTitle').textContent = `📄 ${item.title.toUpperCase()}`;
+                    document.getElementById('viewContent').innerHTML = `
+                        <div style="color: var(--accent-green); border-bottom: 1px solid var(--grid-lines); padding-bottom: 10px; margin-bottom: 20px;">
+                            <strong>STATUS:</strong> DECLASSIFIED<br>
+                            <strong>DATE:</strong> ${new Date(item.timestamp).toLocaleDateString()}
+                        </div>
+                        ${item.imageUrl ? `<img src="${item.imageUrl}" style="max-width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid var(--accent-cyan);">` : ''}
+                        <div style="font-family: 'Courier New', monospace; line-height: 1.6; white-space: pre-wrap; color: #fff;">${item.description}</div>
+                    `;
+                    document.getElementById('viewModal').classList.add('active');
+                }
             }
         }
 
