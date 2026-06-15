@@ -596,7 +596,7 @@
         /* Projects */
         .projects-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
             gap: 30px;
         }
 
@@ -606,6 +606,8 @@
             padding: 30px;
             position: relative;
             transition: all 0.3s ease;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .project-card::before {
@@ -933,6 +935,19 @@
 
             .section-header {
                 font-size: 2rem;
+            }
+
+            .project-card {
+                padding: 20px;
+            }
+
+            .project-card .btn {
+                font-size: 0.7rem;
+                padding: 8px 12px;
+                display: inline-block;
+                width: 100%;
+                text-align: center;
+                box-sizing: border-box;
             }
         }
 
